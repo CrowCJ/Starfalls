@@ -1,0 +1,280 @@
+--@name MusikPlayer
+--@author Spartanoises
+--@shared
+
+List = {
+    {'https://dl.dropbox.com/s/9uygkorukmveie0/Careless%20Whisper%28Instrumental%29.mp3?dl=1', 'Careless Whisper - Instrumental Only'},
+    {'https://dl.dropbox.com/s/razskdybfl1rb01/IdolxIndustry%20Baby.mp3?dl=1', 'Idol x Industry Baby'},
+    {'https://dl.dropbox.com/s/d169so6iw2k4ao1/QilinsPrance.mp3?dl=1', 'Qilin\'s Prance - Ganyu Theme(Genshin Impact)'},
+    {'https://dl.dropbox.com/s/p4deufpty19ob5q/BasshunterDotA.mp3?dl=1', 'DotA - Bass Hunter'},
+    {'https://dl.dropbox.com/s/bb13l8kycgigb4e/AaronSmithDancin%28KRONORemix%29.mp3?dl=1', 'Dancin - Aaron Smith(KRONO Remix)'},
+    {'https://dl.dropbox.com/s/edn1a0i7b32gkio/AmongUsTrapBassBoosted.mp3?dl=1', 'Among Us - Trap Bass Boosted'},
+    {'https://dl.dropbox.com/s/pnyjzb470fb989x/Disc1GlazedMoonOvertheTidesGenshinImpact.mp3?dl=1', 'Disc 1: Glazed Moon Over the Tides - Genshin Impact'},
+    {'https://dl.dropbox.com/s/k5r74lbltldq1qi/ExtraTerra.mp3?dl=1', 'Extra Terra - Paradox'},
+    {'https://dl.dropbox.com/s/ez6mex2tbg12rl9/giornos_theme.mp3?dl=1', 'Giorno\'s Theme'},
+    {'https://dl.dropbox.com/s/x59i95o522n57k9/HalogenUGotThat.mp3?dl=1', 'U Got That - Halogen'},
+    {'https://dl.dropbox.com/s/hni7zyohj2y2ccs/OshiNoKo-lofimix.mp3?dl=1', 'Idol - Lofi Mix'},
+    {'https://dl.dropbox.com/s/4dp7vhe3d1ef38s/Ping_Exyl.mp3?dl=1', 'Ping - Exyl'},
+    {'https://dl.dropbox.com/s/w5id3rxa5qzkn6s/Ping_2_Exyl.mp3?dl=1', 'Ping2 - Exyl'},
+    {'https://dl.dropbox.com/s/ft9jtnuqu9p427t/MySoulyourBeats%21AngelBeatsOPPiano.mp3?dl=1', 'My Soul, Your Beats - Angel Beats Opening(Piano Cover)'},
+    {'https://dl.dropbox.com/s/q1vw1ol7y1h1ygw/IchibannotakaramonoAngelBeatsOSTpiano.mp3?dl=1', 'Ichiban no Takaramono - AngelBeats OST(Piano Cover)'}
+}
+
+if SERVER then
+    --prop.createComponent(Vector pos, Angle ang, string class, string model, boolean frozen)
+    local ent = chip()
+    ent:setMass(250)
+    
+    local max = 120
+    
+    hook.add('think', 'upright', function()
+        local angle = ent:getAngles()
+        local p = angle[1]
+        local y = angle[2]
+        local r = angle[3]
+    
+        if math.abs(p) >= max or math.abs(r) >= max then
+            ent:setAngles(Angle(0, y, 0))
+        end
+    end)
+    
+    local pos    = ent:getPos() + ent:getUp()*48
+    local angle  = ent:getAngles() + Angle(90, 0, 0)
+    local class  = 'starfall_screen'
+    local model  = 'models/hunter/plates/plate1x1.mdl'
+    local frozen = true
+    
+    screen = prop.createComponent(pos, angle, class, model, frozen)
+    screen:setParent(ent)
+    
+    --Entity:linkComponent(Entity or nil e)
+    screen:linkComponent(ent)
+    
+    net.receive('request', function()
+        local nth = net.readInt(8)
+        net.start('play')
+        net.writeInt(nth, 8)
+        net.send()
+    end)    
+else
+    --##--##--##--##--##--##--##--##--##--##--##--##--##--##--##--##--##--
+    
+    --render.createFont(string font, number or nil size, number or nil weight, boolean or nil antialias, boolean or nil additive, boolean or nil shadow, boolean or nil outline, boolean or nil blursize, boolean or nil extended, number or nil scanlines)
+    local font = render.createFont('Times New Roman', 18, 4000, true)
+    render.setFont(font)
+    
+    --##--##--##--##--##--##--##--##--##--##--##--##--##--##--##--##--##--
+    local maxRadius = 1000
+    local maxBar    = 8
+    local fft       = {}
+    for i = 1, maxBar do 
+        table.insert(fft,  0)
+    end
+    
+    local song
+    local cur_name = ''
+    local cur_time = 0
+    local s_length = 0
+    
+    local function loadSong(url)
+        if isValid(song) then song:stop() end
+        
+        bass.loadURL(url, "3d noblock", function(snd, err, errtxt)
+            if snd:isValid() then
+                song = snd
+                
+                snd:setFade(500, maxRadius)
+                snd:setVolume(1)
+                --pcall(snd.setLooping, snd, true)
+                
+                local length = snd:getLength()
+                
+                hook.add("render", "fft", function()
+                    if snd:isValid() and isValid(chip()) then
+                        snd:setPos(chip():getPos())
+                        
+                        local fftN = snd:getFFT(1)
+                        
+                        local time = snd:getTime()
+                        
+                        render.setColor(Color(255, 255, 255, 255))
+                        render.drawRect(0, 256, 512, 8)
+                        render.setColor(Color(0, 0, 0, 255))
+                        render.drawRect(0, 258, (time/length) * 512, 4)
+                        
+                        local timedisplay = string.format(
+                            "%02d:%02d:%02d/%02d:%02d:%02d\nRadius: %d",
+                            math.floor((time/60)/60), math.floor(time/60), math.floor(time%60),
+                            math.floor((length/60)/60), math.floor(length/60), math.floor(length%60),
+                            maxRadius
+                        )
+                        
+                        render.setColor(Color(255, 255, 255, 255))
+                        render.drawText(512, 270, timedisplay, 2)
+                        
+                        for i = 1, maxBar do
+                            local function getMag(i) return fftN[i] or 0 end
+                            fft[i]  = getMag(i)
+                            local mag = fft[i]
+                            local color = Color((360/maxBar * i) * 255, 255, 255, 255):hsvToRGB()
+                            mag = math.clamp(mag, 4, 256)
+                            
+                            render.setColor(color)
+                            render.drawRect((i-1)*(512/maxBar), 256 - mag, 512/maxBar, mag)
+                            render.setColor(Color(0, 0, 0, 255))
+                            render.drawRectOutline((i-1)*(512/maxBar), 256 - mag, 512/maxBar, mag)
+                        end
+                        
+                        render.setColor(Color(255, 255, 255, 255))
+                        render.drawText(6, 270, string.format("%s\n%s", cur_name, snd:getAverageBitRate().."kbps"), 0)
+                    end
+                end)
+            else
+                print(errtxt)
+            end
+        end)
+    end
+    
+    --##--##--##--##--##--##--##--##--##--##--##--##--##--##--##--##--##--
+    
+    local cursor_radius = 4
+    local maxListed     = 5
+    local page          = 1
+    local cursorX       = 0
+    local cursorY       = 0
+    local cursor        = Vector(0, 0)
+    
+    local ListselectW = 512
+    local ListselectH = math.floor((512-384)/maxListed)
+    local PageselectW = 64
+    local PageselectH = 32
+    local pressed     = false
+    hook.add('render', 'ui', function()
+        if player():getPos():getDistance(chip():getPos()) > 250 then return end
+        
+        cursorX, cursorY = render.cursorPos()
+        if cursorX then
+            cursor = Vector(cursorX, cursorY)
+        else
+            cursor = Vector(0, 0)
+        end
+                
+        for i = 1, maxListed do
+            local X = 0
+            local Y = 320 + (i-1)*ListselectH
+            
+            local name = ''
+            if List[i + (page-1)*maxListed] then
+                name = List[i + (page-1)*maxListed][2]
+            else
+                name = ''
+            end
+            
+            local SongName = string.format('%02d. %s', i + (page-1)*maxListed, name)
+            
+            if cursor:withinAABox(Vector(X, Y), Vector(X + ListselectW, Y + ListselectH)) then
+                if List[i + (page-1)*maxListed] and player():keyDown(IN_KEY.USE) and not pressed then
+                    pressed = true
+                    
+                    timer.simple(1, function()
+                        pressed = false
+                    end)
+                    
+                    timer.create('req', 3, 1, function()
+                        local nth = i + (page-1)*maxListed
+                        net.start('request')
+                        net.writeInt(nth, 8)
+                        net.send()
+                    end)
+                end
+                
+                if pressed then
+                    render.setColor(Color(150, 200, 255, 255)*0.5)
+                else
+                    render.setColor(Color(150, 200, 255, 255)*0.75)
+                end
+            else
+                render.setColor(Color(150, 200, 255, 255))
+            end
+            render.drawRect(X, Y, ListselectW, ListselectH)
+            
+            render.setColor(Color(0, 0, 0, 255))
+            render.drawRectOutline(0, Y, ListselectW, ListselectH, 1)
+            
+            render.setColor(Color(0, 0, 0, 255))
+            render.drawText(X + 6, Y + ListselectH*0.25, SongName, 0)
+        end
+        
+        if cursor:withinAABox(Vector(0, 512-64), Vector(0 + PageselectW, 512 - 64 + PageselectH)) then
+            if player():keyDown(IN_KEY.USE) and not pressed then
+                pressed = true
+                timer.simple(0.5, function()
+                    local p = page
+                    p = p - 1
+                    if p < 1 then p = math.ceil(#List/maxListed) end
+                    page = p
+                    pressed = false
+                end)
+            end
+            
+            if pressed then
+                render.setColor(Color(150, 200, 255, 255)*0.5)
+            else
+                render.setColor(Color(150, 200, 255, 255)*0.75)
+            end
+        else
+            render.setColor(Color(150, 200, 255, 255))
+        end
+        render.drawRect(0, 512 - 64, PageselectW, PageselectH)
+        
+        render.setColor(Color(0, 0, 0, 255))
+        render.drawRectOutline(0, 512 - 64, PageselectW, PageselectH, 1)
+        
+        render.setColor(Color(0, 0, 0, 255))
+        render.drawText(6, 512 - 54, 'Prev', 0)
+        
+        if cursor:withinAABox(Vector(128, 512-64), Vector(128 + PageselectW, 512 - 64 + PageselectH)) then
+            if player():keyDown(IN_KEY.USE) and not pressed then
+                pressed = true
+                timer.simple(0.5, function()
+                    local p = page
+                    p = p + 1
+                    if p > math.ceil(#List/maxListed) then p = 1 end
+                    page = p
+                    pressed = false
+                end)
+            end
+            
+            if pressed then
+                render.setColor(Color(150, 200, 255, 255)*0.5)
+            else
+                render.setColor(Color(150, 200, 255, 255)*0.75)
+            end
+        else
+            render.setColor(Color(150, 200, 255, 255))
+        end
+        render.drawRect(128, 512 - 64, PageselectW, PageselectH)
+        
+        render.setColor(Color(0, 0, 0, 255))
+        render.drawRectOutline(128, 512 - 64, PageselectW, PageselectH, 1)
+        
+        render.setColor(Color(0, 0, 0, 255))
+        render.drawText(128 + 6, 512 - 54, 'Next', 0)
+        
+        render.setColor(Color(255, 255, 255, 255))
+        render.drawText(64 + 16, 512 - 54, tostring(page), 0)   
+        
+        if cursorX then
+            render.setColor(Color(255, 255, 255, 255))
+            render.drawFilledCircle(cursorX, cursorY, cursor_radius)
+        end
+    end)
+    
+    net.receive('play', function()
+        local nth = net.readInt(8)
+        if List[nth] then
+            loadSong(List[nth][1])
+            cur_name = List[nth][2]
+        end
+    end)
+end

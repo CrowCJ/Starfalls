@@ -1,0 +1,56 @@
+--@name Decorate
+--@author
+--@shared
+
+if SERVER then
+    --prop.createComponent(Vector pos, Angle ang, string class, string model, boolean frozen)
+    local ent = chip()
+    ent:setMass(250)
+    
+    local pos    = ent:getPos() + ent:getUp()*48
+    local angle  = ent:getAngles() + Angle(90, 0, 0)
+    local class  = 'starfall_screen'
+    local model  = 'models/hunter/plates/plate1x1.mdl'
+    local frozen = true
+    
+    screen = prop.createComponent(pos, angle, class, model, frozen)
+    screen:setParent(ent)
+    
+    --Entity:linkComponent(Entity or nil e)
+    screen:linkComponent(ent)
+else
+    local url = 'https://dl.dropbox.com/s/9uygkorukmveie0/Careless%20Whisper%28Instrumental%29.mp3?dl=1'
+    
+    local max = 64
+    local n   = 1
+    local b   = 0
+    local var = 256
+    fftN = {}
+    fft  = {}
+    for i = 1, max do table.insert(fftN, 0) end
+    for i = 1, max do table.insert(fft, 0) end
+    
+    bass.loadURL(url, "3d noblock", function(snd, err, errtxt)
+        if song then stop:stop() end
+        if snd then
+            song = snd
+            if isValid(snd) and isValid(chip()) then
+                snd:setPos(chip():getPos())
+            end
+            snd:setFade(500, 1500)
+            snd:setVolume(1)
+            --local fft = snd:getFFT(1)
+            hook.add('render', 'fft', function()
+                n = n + 1
+                local t = timer.frametime() * 2
+                for i = 1, max do
+                    fft[i] = math.sin(math.rad(360/max * i - n)) * 256 + 256
+                    local r = fft[i]
+                    fftN[i] = fftN[i] + (r - fftN[i]) * t
+                    render.setColor(Color(360/max * i * 255, 255, 255, 255):hsvToRGB())
+                    render.drawRect(512/max * (i-1), 512 - fftN[i], 512/max, fftN[i])
+                end
+            end)
+        end
+    end)
+end
